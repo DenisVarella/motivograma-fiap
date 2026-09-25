@@ -40,7 +40,7 @@ export function PainelInicio() {
           <span className="mb-1 block text-[11px] tracking-[0.22em] text-rosa uppercase">
             02
           </span>
-          Arraste a bolinha do centro até uma das quatro marcas. As pontas são a aceitação total e as do meio, a parcial. Ela fica rosa quando encaixa.
+          Arraste a bolinha do centro até uma das quatro marcas. As pontas são a aceitação total e as do meio, a parcial.
         </li>
         <li>
           <span className="mb-1 block text-[11px] tracking-[0.22em] text-rosa uppercase">

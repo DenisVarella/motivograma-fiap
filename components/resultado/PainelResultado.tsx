@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GraficoBarras } from "@/components/resultado/GraficoBarras";
 import { GraficoRadar } from "@/components/resultado/GraficoRadar";
@@ -8,13 +8,17 @@ import { LeituraPerfil } from "@/components/resultado/LeituraPerfil";
 import { BotaoContorno } from "@/components/visual/BotaoContorno";
 import { Cabecalho } from "@/components/visual/Cabecalho";
 import { useMontado } from "@/lib/interface/use-montado";
+import { baixarResultadoPdf } from "@/lib/resultado/baixar-pdf";
 import { montarPerfil, type Perfil } from "@/lib/motivograma/pontuacao";
 import { lerSessao, limparSessao, type Sessao } from "@/lib/motivograma/sessao";
 
 export function PainelResultado() {
   const router = useRouter();
   const montado = useMontado();
+  const areaPdf = useRef<HTMLElement>(null);
   const [sessao, setSessao] = useState<Sessao | null>(null);
+  const [gerando, setGerando] = useState(false);
+  const [falhaPdf, setFalhaPdf] = useState(false);
 
   if (montado && sessao === null) {
     setSessao(lerSessao());
@@ -36,8 +40,25 @@ export function PainelResultado() {
     router.push("/teste");
   }
 
+  async function baixar() {
+    if (!areaPdf.current || gerando) {
+      return;
+    }
+
+    setGerando(true);
+    setFalhaPdf(false);
+
+    try {
+      await baixarResultadoPdf(areaPdf.current);
+    } catch {
+      setFalhaPdf(true);
+    } finally {
+      setGerando(false);
+    }
+  }
+
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-6xl px-6 py-10">
+    <main ref={areaPdf} className="mx-auto min-h-dvh w-full max-w-6xl bg-background px-6 py-10">
       <Cabecalho />
 
       {!perfil ? (
@@ -51,11 +72,19 @@ export function PainelResultado() {
                 Nível das necessidades
               </h1>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3" data-pdf-oculto="true">
+              <BotaoContorno onClick={baixar} disabled={gerando} destaque>
+                {gerando ? "Gerando" : "Download"}
+              </BotaoContorno>
               <BotaoContorno href="/teste">Revisar respostas</BotaoContorno>
               <BotaoContorno onClick={refazer}>Refazer</BotaoContorno>
             </div>
           </div>
+          {falhaPdf ? (
+            <p className="mt-4 text-sm text-rosa" data-pdf-oculto="true">
+              Não foi possível gerar o PDF. Tente de novo.
+            </p>
+          ) : null}
 
           <div className="mt-10 grid gap-10 lg:grid-cols-2">
             <section className="border border-fio p-4 sm:p-6">

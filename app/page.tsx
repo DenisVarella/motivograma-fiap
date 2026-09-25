@@ -7,7 +7,7 @@ export default function PaginaInicial() {
         <p className="text-[11px] tracking-[0.28em] text-zinc-500 uppercase">Autoavaliação</p>
         <div>
           <h1 className="font-display text-5xl tracking-tight text-rosa sm:text-6xl lg:text-7xl">
-            Motivograma
+            Meu<br/>Motivograma
           </h1>
           <p className="mt-6 max-w-md text-xl text-zinc-200">
             Veja qual necessidade está puxando o seu empenho agora.

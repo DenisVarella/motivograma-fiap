@@ -1,26 +1,170 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0c0c0e;
+  --foreground: #f4f4f5;
+  --rosa: #e4236b;
+  --fio: rgba(255, 255, 255, 0.14);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-rosa: var(--rosa);
+  --color-fio: var(--fio);
+  --font-sans: var(--font-manrope), sans-serif;
+  --font-display: var(--font-sora), sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), sans-serif;
+}
+
+::selection {
+  background: #e4236b;
+  color: #ffffff;
+}
+
+@keyframes revela {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes entra-direita {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes entra-esquerda {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ponto-pulsa {
+  from {
+    opacity: 0.35;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes deriva {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(var(--dx), var(--dy), 0);
+  }
+}
+
+@keyframes card-entra {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.revela {
+  animation: revela 0.7s ease both;
+}
+
+.revela-atraso {
+  animation-delay: 0.15s;
+}
+
+.page-enter {
+  animation: page-enter 0.45s ease both;
+}
+
+.entra-direita {
+  animation: entra-direita 0.38s ease both;
+}
+
+.entra-esquerda {
+  animation: entra-esquerda 0.38s ease both;
+}
+
+.ponto-pulsa {
+  animation: ponto-pulsa 0.25s ease;
+}
+
+.marca {
+  animation: deriva var(--dur) ease-in-out infinite alternate;
+}
+
+.card-entra {
+  animation: card-entra 0.55s ease both;
+}
+
+.barra-progresso {
+  transition: width 0.45s ease;
+}
+
+.marcador {
+  transition:
+    left 0.28s ease,
+    background-color 0.2s ease,
+    width 0.2s ease,
+    height 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .revela,
+  .revela-atraso,
+  .page-enter,
+  .entra-direita,
+  .entra-esquerda,
+  .ponto-pulsa,
+  .marca,
+  .card-entra {
+    animation: none;
+  }
+
+  .barra-progresso,
+  .marcador {
+    transition: none;
+  }
 }

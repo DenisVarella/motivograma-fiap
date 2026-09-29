@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 type Propriedades = {
   children: ReactNode;
   href?: string;
+  type?: "button" | "submit";
   onClick?: () => void;
   disabled?: boolean;
   destaque?: boolean;
@@ -18,6 +19,7 @@ const BASE =
 export function BotaoContorno({
   children,
   href,
+  type = "button",
   onClick,
   disabled = false,
   destaque = false,
@@ -37,7 +39,7 @@ export function BotaoContorno({
   }
 
   return (
-    <button type="button" className={classe} onClick={onClick} disabled={disabled}>
+    <button type={type} className={classe} onClick={onClick} disabled={disabled}>
       {children}
     </button>
   );

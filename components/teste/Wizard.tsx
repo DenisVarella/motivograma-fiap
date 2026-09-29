@@ -6,6 +6,7 @@ import { BarraProgresso } from "@/components/teste/BarraProgresso";
 import { QuestaoCard } from "@/components/teste/QuestaoCard";
 import { BotaoContorno } from "@/components/visual/BotaoContorno";
 import { Cabecalho } from "@/components/visual/Cabecalho";
+import { sincronizarSessao } from "@/lib/firebase/registros";
 import { useMontado } from "@/lib/interface/use-montado";
 import { QUESTOES } from "@/lib/motivograma/questoes";
 import { ePontosPrimeira, type PontosPrimeira } from "@/lib/motivograma/pontuacao";
@@ -24,12 +25,23 @@ export function Wizard() {
   const montado = useMontado();
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const [direcao, setDirecao] = useState<Direcao>("direita");
+  const [aviso, setAviso] = useState<string | null>(null);
 
   if (montado && sessao === null) {
     setSessao(lerSessao());
   }
 
   const indice = sessao?.indice ?? 0;
+
+  useEffect(() => {
+    if (!montado || !sessao) {
+      return;
+    }
+
+    if (!sessao.rm) {
+      router.replace("/");
+    }
+  }, [montado, sessao, router]);
 
   useEffect(() => {
     if (!montado) {
@@ -40,7 +52,7 @@ export function Wizard() {
     window.scrollTo({ top: 0, behavior: reduzido ? "auto" : "smooth" });
   }, [indice, montado]);
 
-  if (!sessao) {
+  if (!sessao || !sessao.rm) {
     return (
       <main className="mx-auto min-h-dvh w-full max-w-3xl px-6 py-10">
         <Cabecalho />
@@ -59,6 +71,9 @@ export function Wizard() {
   function persistir(proxima: Sessao) {
     setSessao(proxima);
     gravarSessao(proxima);
+    void sincronizarSessao(proxima)
+      .then(() => setAviso(null))
+      .catch(() => setAviso("Não foi possível gravar no Firebase."));
   }
 
   function escolher(pontos: PontosPrimeira) {
@@ -101,6 +116,7 @@ export function Wizard() {
       <Cabecalho />
       <div className="mt-10">
         <BarraProgresso respondidas={respondidas} total={QUESTOES.length} />
+        {aviso ? <p className="mt-3 text-sm text-rosa">{aviso}</p> : null}
       </div>
       <div key={indice} className={`mt-12 ${direcao === "direita" ? "entra-direita" : "entra-esquerda"}`}>
         <QuestaoCard questao={questao} resposta={resposta} onEscolher={escolher} />

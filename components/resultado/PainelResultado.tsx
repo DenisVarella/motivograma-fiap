@@ -7,10 +7,12 @@ import { GraficoRadar } from "@/components/resultado/GraficoRadar";
 import { LeituraPerfil } from "@/components/resultado/LeituraPerfil";
 import { BotaoContorno } from "@/components/visual/BotaoContorno";
 import { Cabecalho } from "@/components/visual/Cabecalho";
+import { mensagemDeFirebase } from "@/lib/firebase/cliente";
+import { reiniciarTentativa, sincronizarSessao } from "@/lib/firebase/registros";
 import { useMontado } from "@/lib/interface/use-montado";
 import { baixarResultadoPdf } from "@/lib/resultado/baixar-pdf";
 import { montarPerfil, type Perfil } from "@/lib/motivograma/pontuacao";
-import { lerSessao, limparSessao, type Sessao } from "@/lib/motivograma/sessao";
+import { gravarSessao, lerSessao, sessaoVazia, type Sessao } from "@/lib/motivograma/sessao";
 
 export function PainelResultado() {
   const router = useRouter();
@@ -19,6 +21,7 @@ export function PainelResultado() {
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const [gerando, setGerando] = useState(false);
   const [falhaPdf, setFalhaPdf] = useState(false);
+  const [falhaSalvar, setFalhaSalvar] = useState<string | null>(null);
 
   if (montado && sessao === null) {
     setSessao(lerSessao());
@@ -28,16 +31,40 @@ export function PainelResultado() {
   const completo = perfil !== null;
 
   useEffect(() => {
-    if (!sessao || completo) {
+    if (!sessao) {
       return;
     }
 
-    router.replace("/teste");
+    if (!sessao.rm) {
+      router.replace("/");
+      return;
+    }
+
+    if (!completo) {
+      router.replace("/teste");
+      return;
+    }
+
+    void sincronizarSessao(sessao).catch((falha: unknown) => {
+      setFalhaSalvar(mensagemDeFirebase(falha));
+    });
   }, [sessao, completo, router]);
 
-  function refazer() {
-    limparSessao();
-    router.push("/teste");
+  async function refazer() {
+    if (!sessao?.rm) {
+      return;
+    }
+
+    setFalhaSalvar(null);
+
+    try {
+      const nova = sessaoVazia({ rm: sessao.rm, nome: sessao.nome });
+      await reiniciarTentativa(sessao.rm, sessao.nome);
+      gravarSessao(nova);
+      router.push("/teste");
+    } catch (falha) {
+      setFalhaSalvar(mensagemDeFirebase(falha));
+    }
   }
 
   async function baixar() {
@@ -83,6 +110,11 @@ export function PainelResultado() {
           {falhaPdf ? (
             <p className="mt-4 text-sm text-rosa" data-pdf-oculto="true">
               Não foi possível gerar o PDF. Tente de novo.
+            </p>
+          ) : null}
+          {falhaSalvar ? (
+            <p className="mt-4 text-sm text-rosa" data-pdf-oculto="true">
+              {falhaSalvar}
             </p>
           ) : null}
 

@@ -2,28 +2,82 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { FormularioParticipante } from "@/components/inicio/FormularioParticipante";
 import { BotaoContorno } from "@/components/visual/BotaoContorno";
-import { useMontado } from "@/lib/interface/use-montado";
-import { contarRespondidas, lerSessao, limparSessao, type Sessao } from "@/lib/motivograma/sessao";
+import { mensagemDeFirebase } from "@/lib/firebase/cliente";
+import { carregarParticipante, reiniciarTentativa, sincronizarSessao } from "@/lib/firebase/registros";
 import { respostasCompletas } from "@/lib/motivograma/pontuacao";
 import { QUESTOES } from "@/lib/motivograma/questoes";
+import {
+  contarRespondidas,
+  gravarSessao,
+  sessaoVazia,
+  type Sessao,
+} from "@/lib/motivograma/sessao";
 
 export function PainelInicio() {
   const router = useRouter();
-  const montado = useMontado();
-  const [sessao, setSessao] = useState<Sessao | null>(null);
+  const [formularioAberto, setFormularioAberto] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [identificado, setIdentificado] = useState<Sessao | null>(null);
 
-  if (montado && sessao === null) {
-    setSessao(lerSessao());
+  const respondidas = identificado ? contarRespondidas(identificado.respostas) : 0;
+  const jaRespondeu = respondidas > 0;
+
+  async function confirmar(rm: string, nome: string) {
+    setEnviando(true);
+    setErro(null);
+
+    try {
+      const existente = await carregarParticipante(rm);
+
+      if (existente && contarRespondidas(existente.respostas) > 0) {
+        const atualizada = { ...existente, nome };
+        await sincronizarSessao(atualizada);
+        setIdentificado(atualizada);
+        setFormularioAberto(false);
+        return;
+      }
+
+      const nova = sessaoVazia({ rm, nome });
+      await sincronizarSessao(nova);
+      gravarSessao(nova);
+      router.push("/teste");
+    } catch (falha) {
+      setErro(mensagemDeFirebase(falha));
+    } finally {
+      setEnviando(false);
+    }
   }
 
-  const pronta = sessao !== null;
-  const respondidas = sessao ? contarRespondidas(sessao.respostas) : 0;
-  const completa = sessao ? respostasCompletas(sessao.respostas) : false;
+  function continuar() {
+    if (!identificado) {
+      return;
+    }
 
-  function comecarDeNovo() {
-    limparSessao();
-    router.push("/teste");
+    gravarSessao(identificado);
+    router.push(respostasCompletas(identificado.respostas) ? "/resultado" : "/teste");
+  }
+
+  async function comecarDeNovo() {
+    if (!identificado) {
+      return;
+    }
+
+    setEnviando(true);
+    setErro(null);
+
+    try {
+      const nova = sessaoVazia({ rm: identificado.rm, nome: identificado.nome });
+      await reiniciarTentativa(identificado.rm, identificado.nome);
+      gravarSessao(nova);
+      router.push("/teste");
+    } catch (falha) {
+      setErro(mensagemDeFirebase(falha));
+    } finally {
+      setEnviando(false);
+    }
   }
 
   return (
@@ -50,35 +104,58 @@ export function PainelInicio() {
         </li>
       </ol>
 
-      <div className="mt-12 flex flex-wrap gap-3">
-        {!pronta ? (
-          <span className="inline-flex h-12 w-44 border border-white/10" aria-hidden />
-        ) : completa ? (
-          <>
-            <BotaoContorno href="/resultado" destaque>
-              Ver resultado
-            </BotaoContorno>
-            <BotaoContorno onClick={comecarDeNovo}>Refazer</BotaoContorno>
-          </>
-        ) : respondidas > 0 ? (
-          <>
-            <BotaoContorno href="/teste" destaque>
-              Continuar
-            </BotaoContorno>
-            <BotaoContorno onClick={comecarDeNovo}>Começar de novo</BotaoContorno>
-          </>
+      <div className="mt-12">
+        {formularioAberto ? (
+          <FormularioParticipante
+            enviando={enviando}
+            erro={erro}
+            onConfirmar={confirmar}
+            onCancelar={() => {
+              setFormularioAberto(false);
+              setErro(null);
+            }}
+          />
+        ) : jaRespondeu && identificado ? (
+          <div>
+            <p className="text-sm text-zinc-400">
+              Olá, {identificado.nome}. Este RM já tem respostas salvas.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <BotaoContorno onClick={continuar} destaque disabled={enviando}>
+                Continuar
+              </BotaoContorno>
+              <BotaoContorno onClick={comecarDeNovo} disabled={enviando}>
+                Começar de novo
+              </BotaoContorno>
+            </div>
+            <p className="mt-4 text-sm text-zinc-500">
+              {respondidas} de {QUESTOES.length} itens já respondidos.
+            </p>
+            {erro ? <p className="mt-3 text-sm text-rosa">{erro}</p> : null}
+            <button
+              type="button"
+              onClick={() => {
+                setIdentificado(null);
+                setErro(null);
+                setFormularioAberto(true);
+              }}
+              className="mt-5 text-[11px] tracking-[0.22em] text-zinc-500 uppercase hover:text-rosa"
+            >
+              Usar outro RM
+            </button>
+          </div>
         ) : (
-          <BotaoContorno onClick={comecarDeNovo} destaque>
+          <BotaoContorno
+            onClick={() => {
+              setErro(null);
+              setFormularioAberto(true);
+            }}
+            destaque
+          >
             Começar
           </BotaoContorno>
         )}
       </div>
-
-      {pronta && respondidas > 0 && !completa ? (
-        <p className="mt-4 text-sm text-zinc-500">
-          {respondidas} de {QUESTOES.length} itens já respondidos.
-        </p>
-      ) : null}
     </section>
   );
 }

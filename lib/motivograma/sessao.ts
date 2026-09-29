@@ -1,5 +1,6 @@
 /**
- * A sessão fica só no navegador. Não há conta nem servidor de respostas.
+ * Cópia local da tentativa, para o teste continuar se a página recarregar.
+ * O registro oficial fica no Firestore, ligado ao RM.
  */
 
 import { QUESTOES } from "@/lib/motivograma/questoes";
@@ -11,13 +12,20 @@ import {
 
 const CHAVE = "motivograma.sessao.v1";
 
-export type Sessao = {
+export type Participante = {
+  rm: string;
+  nome: string;
+};
+
+export type Sessao = Participante & {
   respostas: Resposta[];
   indice: number;
 };
 
-export function sessaoVazia(): Sessao {
+export function sessaoVazia(participante?: Participante): Sessao {
   return {
+    rm: participante?.rm ?? "",
+    nome: participante?.nome ?? "",
     respostas: Array.from({ length: QUESTOES.length }, () => null),
     indice: 0,
   };
@@ -53,12 +61,22 @@ export function contarRespondidas(respostas: readonly Resposta[]): number {
   return respostas.filter((resposta) => ePontosPrimeira(resposta)).length;
 }
 
-function normalizar(valor: unknown): Sessao {
+function textoCurto(valor: unknown) {
+  return typeof valor === "string" ? valor.trim().slice(0, 120) : "";
+}
+
+/** Aceita o JSON local ou o documento lido do Firestore. */
+export function montarSessao(valor: unknown): Sessao {
   if (!valor || typeof valor !== "object") {
     return sessaoVazia();
   }
 
-  const registro = valor as { respostas?: unknown; indice?: unknown };
+  const registro = valor as {
+    rm?: unknown;
+    nome?: unknown;
+    respostas?: unknown;
+    indice?: unknown;
+  };
   const respostasRecebidas = Array.isArray(registro.respostas)
     ? registro.respostas
     : [];
@@ -76,7 +94,16 @@ function normalizar(valor: unknown): Sessao {
       ? registro.indice
       : 0;
 
-  return { respostas, indice };
+  return {
+    rm: textoCurto(registro.rm),
+    nome: textoCurto(registro.nome),
+    respostas,
+    indice,
+  };
+}
+
+function normalizar(valor: unknown): Sessao {
+  return montarSessao(valor);
 }
 
 export function atualizarResposta(

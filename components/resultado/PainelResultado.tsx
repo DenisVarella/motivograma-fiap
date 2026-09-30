@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { GraficoBarras } from "@/components/resultado/GraficoBarras";
 import { GraficoRadar } from "@/components/resultado/GraficoRadar";
 import { LeituraPerfil } from "@/components/resultado/LeituraPerfil";
+import { PainelComparativo } from "@/components/resultado/PainelComparativo";
 import { BotaoContorno } from "@/components/visual/BotaoContorno";
 import { Cabecalho } from "@/components/visual/Cabecalho";
 import { mensagemDeFirebase } from "@/lib/firebase/cliente";
@@ -22,6 +23,7 @@ export function PainelResultado() {
   const [gerando, setGerando] = useState(false);
   const [falhaPdf, setFalhaPdf] = useState(false);
   const [falhaSalvar, setFalhaSalvar] = useState<string | null>(null);
+  const [comparando, setComparando] = useState(false);
 
   if (montado && sessao === null) {
     setSessao(lerSessao());
@@ -94,17 +96,28 @@ export function PainelResultado() {
         <div className="mt-12">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-[11px] tracking-[0.28em] text-zinc-500 uppercase">Resultado</p>
+              <p className="text-[11px] tracking-[0.28em] text-zinc-500 uppercase">
+                {comparando ? "Grupo" : "Resultado"}
+              </p>
               <h1 className="font-display mt-3 text-4xl text-rosa sm:text-5xl">
-                Nível das necessidades
+                {comparando ? "Quem já respondeu" : "Nível das necessidades"}
               </h1>
             </div>
             <div className="flex flex-wrap gap-3" data-pdf-oculto="true">
-              <BotaoContorno onClick={baixar} disabled={gerando} destaque>
-                {gerando ? "Gerando" : "Download"}
-              </BotaoContorno>
-              <BotaoContorno href="/teste">Revisar respostas</BotaoContorno>
-              <BotaoContorno onClick={refazer}>Refazer</BotaoContorno>
+              {comparando ? (
+                <BotaoContorno onClick={() => setComparando(false)} destaque>
+                  Meu resultado
+                </BotaoContorno>
+              ) : (
+                <>
+                  <BotaoContorno onClick={baixar} disabled={gerando} destaque>
+                    {gerando ? "Gerando" : "Download"}
+                  </BotaoContorno>
+                  <BotaoContorno onClick={() => setComparando(true)}>Comparar</BotaoContorno>
+                  <BotaoContorno href="/teste">Revisar respostas</BotaoContorno>
+                  <BotaoContorno onClick={refazer}>Refazer</BotaoContorno>
+                </>
+              )}
             </div>
           </div>
           {falhaPdf ? (
@@ -118,6 +131,10 @@ export function PainelResultado() {
             </p>
           ) : null}
 
+          {comparando && sessao ? (
+            <PainelComparativo rm={sessao.rm} nome={sessao.nome} perfil={perfil} />
+          ) : (
+          <>
           <div className="mt-10 grid gap-10 lg:grid-cols-2">
             <section className="border border-fio p-4 sm:p-6">
               <p className="text-[11px] tracking-[0.22em] text-zinc-500 uppercase">
@@ -146,6 +163,8 @@ export function PainelResultado() {
           <div className="mt-12">
             <LeituraPerfil perfil={perfil} />
           </div>
+          </>
+          )}
         </div>
       )}
     </main>

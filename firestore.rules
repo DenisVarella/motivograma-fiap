@@ -5,7 +5,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /usuarios/{rm} {
-      allow read: if rmValido(rm);
+      allow get: if rmValido(rm);
+      // A tela comparativa lista quem já tem resultado. Sem login, a coleção é legível.
+      allow list: if true;
       allow create, update: if rmValido(rm)
         && request.resource.data.rm == rm
         && nomeValido(request.resource.data.nome);

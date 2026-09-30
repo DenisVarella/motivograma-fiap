@@ -5,8 +5,9 @@
  * O id do documento é o RM.
  */
 
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { obterFirestore } from "@/lib/firebase/cliente";
+import { CODIGOS, type CodigoNecessidade } from "@/lib/motivograma/necessidades";
 import { montarPerfil, type Perfil } from "@/lib/motivograma/pontuacao";
 import { montarSessao, sessaoVazia, type Sessao } from "@/lib/motivograma/sessao";
 
@@ -80,4 +81,75 @@ export async function sincronizarSessao(sessao: Sessao) {
 /** Zera as marcações e o resultado, e mantém o mesmo RM. */
 export async function reiniciarTentativa(rm: string, nome: string) {
   await sincronizarSessao(sessaoVazia({ rm, nome }));
+}
+
+export type ResultadoComparavel = {
+  rm: string;
+  nome: string;
+  notas: Record<CodigoNecessidade, number>;
+  predominantes: CodigoNecessidade[];
+};
+
+function eCodigo(valor: unknown): valor is CodigoNecessidade {
+  return typeof valor === "string" && (CODIGOS as readonly string[]).includes(valor);
+}
+
+function notasValidas(valor: unknown): Record<CodigoNecessidade, number> | null {
+  if (!valor || typeof valor !== "object") {
+    return null;
+  }
+
+  const registro = valor as Record<string, unknown>;
+  const notas = {} as Record<CodigoNecessidade, number>;
+
+  for (const codigo of CODIGOS) {
+    const pontos = registro[codigo];
+
+    if (typeof pontos !== "number" || !Number.isFinite(pontos)) {
+      return null;
+    }
+
+    notas[codigo] = pontos;
+  }
+
+  const soma = CODIGOS.reduce((total, codigo) => total + notas[codigo], 0);
+
+  if (soma !== 90) {
+    return null;
+  }
+
+  return notas;
+}
+
+/** Quem já fechou as 30 marcações. Quem recomeçou fica de fora até terminar de novo. */
+export async function listarResultados(): Promise<ResultadoComparavel[]> {
+  const db = obterFirestore();
+  const consulta = await getDocs(collection(db, USUARIOS));
+  const lista: ResultadoComparavel[] = [];
+
+  consulta.forEach((documento) => {
+    const dados = documento.data();
+    const resultado = dados.resultado as { notas?: unknown; predominantes?: unknown } | null;
+    const notas = notasValidas(resultado?.notas);
+
+    if (!notas) {
+      return;
+    }
+
+    const nome =
+      typeof dados.nome === "string" && dados.nome.trim() ? dados.nome.trim() : documento.id;
+    const predominantes = Array.isArray(resultado?.predominantes)
+      ? resultado.predominantes.filter(eCodigo)
+      : [];
+
+    lista.push({
+      rm: documento.id,
+      nome,
+      notas,
+      predominantes,
+    });
+  });
+
+  lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  return lista;
 }

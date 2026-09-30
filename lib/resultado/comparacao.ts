@@ -18,6 +18,19 @@ export function predominantesDe(notas: Record<CodigoNecessidade, number>): Codig
   return CODIGOS.filter((codigo) => notas[codigo] === maior);
 }
 
+const MESES_DA_COMPARACAO = 24;
+
+/** Resultados mais antigos que isto saem da média e da tabela. */
+export function dentroDaJanela(instante: Date, agora = new Date()): boolean {
+  const limite = new Date(agora);
+  limite.setMonth(limite.getMonth() - MESES_DA_COMPARACAO);
+  return instante.getTime() >= limite.getTime();
+}
+
+export function nomeVisivel(pessoa: ResultadoComparavel): string {
+  return pessoa.anonimo ? "Anônimo" : pessoa.nome;
+}
+
 /** Garante a pessoa atual na lista, mesmo se o Firestore ainda não devolveu o documento dela. */
 export function grupoComParticipante(
   lista: readonly ResultadoComparavel[],

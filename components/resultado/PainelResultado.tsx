@@ -5,11 +5,17 @@ import { useRouter } from "next/navigation";
 import { GraficoBarras } from "@/components/resultado/GraficoBarras";
 import { GraficoRadar } from "@/components/resultado/GraficoRadar";
 import { LeituraPerfil } from "@/components/resultado/LeituraPerfil";
+import { OpcaoAnonimato } from "@/components/resultado/OpcaoAnonimato";
 import { PainelComparativo } from "@/components/resultado/PainelComparativo";
 import { BotaoContorno } from "@/components/visual/BotaoContorno";
 import { Cabecalho } from "@/components/visual/Cabecalho";
 import { mensagemDeFirebase } from "@/lib/firebase/cliente";
-import { reiniciarTentativa, sincronizarSessao } from "@/lib/firebase/registros";
+import {
+  definirAnonimato,
+  lerAnonimato,
+  reiniciarTentativa,
+  sincronizarSessao,
+} from "@/lib/firebase/registros";
 import { useMontado } from "@/lib/interface/use-montado";
 import { baixarResultadoPdf } from "@/lib/resultado/baixar-pdf";
 import { montarPerfil, type Perfil } from "@/lib/motivograma/pontuacao";
@@ -19,11 +25,14 @@ export function PainelResultado() {
   const router = useRouter();
   const montado = useMontado();
   const areaPdf = useRef<HTMLElement>(null);
+  const preferenciaCarregada = useRef(false);
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const [gerando, setGerando] = useState(false);
   const [falhaPdf, setFalhaPdf] = useState(false);
   const [falhaSalvar, setFalhaSalvar] = useState<string | null>(null);
   const [comparando, setComparando] = useState(false);
+  const [anonimo, setAnonimo] = useState(false);
+  const [salvandoAnonimo, setSalvandoAnonimo] = useState(false);
 
   if (montado && sessao === null) {
     setSessao(lerSessao());
@@ -50,7 +59,40 @@ export function PainelResultado() {
     void sincronizarSessao(sessao).catch((falha: unknown) => {
       setFalhaSalvar(mensagemDeFirebase(falha));
     });
+
+    if (preferenciaCarregada.current) {
+      return;
+    }
+
+    void lerAnonimato(sessao.rm)
+      .then((valor) => {
+        if (!preferenciaCarregada.current) {
+          preferenciaCarregada.current = true;
+          setAnonimo(valor);
+        }
+      })
+      .catch(() => undefined);
   }, [sessao, completo, router]);
+
+  async function alterarAnonimato(valor: boolean) {
+    if (!sessao?.rm) {
+      return;
+    }
+
+    preferenciaCarregada.current = true;
+    setAnonimo(valor);
+    setSalvandoAnonimo(true);
+    setFalhaSalvar(null);
+
+    try {
+      await definirAnonimato(sessao.rm, sessao.nome, valor);
+    } catch (falha) {
+      setAnonimo(!valor);
+      setFalhaSalvar(mensagemDeFirebase(falha));
+    } finally {
+      setSalvandoAnonimo(false);
+    }
+  }
 
   async function refazer() {
     if (!sessao?.rm) {
@@ -131,8 +173,25 @@ export function PainelResultado() {
             </p>
           ) : null}
 
+          {sessao && !comparando ? (
+            <div className="mt-8" data-pdf-oculto="true">
+              <OpcaoAnonimato
+                marcado={anonimo}
+                salvando={salvandoAnonimo}
+                onAlterar={alterarAnonimato}
+              />
+            </div>
+          ) : null}
+
           {comparando && sessao ? (
-            <PainelComparativo rm={sessao.rm} nome={sessao.nome} perfil={perfil} />
+            <PainelComparativo
+              rm={sessao.rm}
+              nome={sessao.nome}
+              perfil={perfil}
+              anonimo={anonimo}
+              salvandoAnonimo={salvandoAnonimo}
+              onAlterarAnonimato={alterarAnonimato}
+            />
           ) : (
           <>
           <div className="mt-10 grid gap-10 lg:grid-cols-2">

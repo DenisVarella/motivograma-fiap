@@ -14,13 +14,32 @@ import { montarSessao, sessaoVazia, type Sessao } from "@/lib/motivograma/sessao
 const USUARIOS = "usuarios";
 const RESPOSTAS = "respostas";
 
-function resultadoDe(perfil: Perfil) {
+function notasDe(perfil: Perfil): Record<CodigoNecessidade, number> {
+  return Object.fromEntries(perfil.serie.map((item) => [item.codigo, item.pontos])) as Record<
+    CodigoNecessidade,
+    number
+  >;
+}
+
+function mesmasNotas(salvas: unknown, perfil: Perfil) {
+  if (!salvas || typeof salvas !== "object") {
+    return false;
+  }
+
+  const atuais = notasDe(perfil);
+  const registro = salvas as Record<string, unknown>;
+
+  return CODIGOS.every((codigo) => registro[codigo] === atuais[codigo]);
+}
+
+function resultadoDe(perfil: Perfil, registradoEm: unknown) {
   return {
-    notas: Object.fromEntries(perfil.serie.map((item) => [item.codigo, item.pontos])),
+    notas: notasDe(perfil),
     predominantes: perfil.predominantes.map((item) => item.codigo),
     mediaPrimaria: perfil.mediaPrimaria,
     mediaSecundaria: perfil.mediaSecundaria,
     soma: perfil.soma,
+    registradoEm,
   };
 }
 
@@ -53,13 +72,24 @@ export async function sincronizarSessao(sessao: Sessao) {
 
   const db = obterFirestore();
   const perfil = montarPerfil(sessao.respostas);
+  const referencia = doc(db, USUARIOS, sessao.rm);
+  let registradoEm: unknown = serverTimestamp();
+
+  if (perfil) {
+    const existente = await getDoc(referencia);
+    const anterior = existente.data()?.resultado as { notas?: unknown; registradoEm?: unknown } | null;
+
+    if (anterior && mesmasNotas(anterior.notas, perfil) && anterior.registradoEm) {
+      registradoEm = anterior.registradoEm;
+    }
+  }
 
   await setDoc(
-    doc(db, USUARIOS, sessao.rm),
+    referencia,
     {
       rm: sessao.rm,
       nome: sessao.nome,
-      resultado: perfil ? resultadoDe(perfil) : null,
+      resultado: perfil ? resultadoDe(perfil, registradoEm) : null,
       atualizadoEm: serverTimestamp(),
     },
     { merge: true },
@@ -86,9 +116,55 @@ export async function reiniciarTentativa(rm: string, nome: string) {
 export type ResultadoComparavel = {
   rm: string;
   nome: string;
+  anonimo: boolean;
+  registradoEm: Date;
   notas: Record<CodigoNecessidade, number>;
   predominantes: CodigoNecessidade[];
 };
+
+export async function lerAnonimato(rm: string): Promise<boolean> {
+  const db = obterFirestore();
+  const usuario = await getDoc(doc(db, USUARIOS, rm));
+  return usuario.data()?.anonimo === true;
+}
+
+/** O nome some na comparação; as notas continuam na média. */
+export async function definirAnonimato(rm: string, nome: string, anonimo: boolean) {
+  const db = obterFirestore();
+
+  await setDoc(
+    doc(db, USUARIOS, rm),
+    { rm, nome, anonimo },
+    { merge: true },
+  );
+}
+
+function instanteDe(valor: unknown): Date | null {
+  if (!valor) {
+    return null;
+  }
+
+  if (typeof valor === "object" && valor !== null && "toDate" in valor) {
+    const data = (valor as { toDate: () => Date }).toDate();
+    return data instanceof Date && !Number.isNaN(data.getTime()) ? data : null;
+  }
+
+  if (typeof valor === "object" && valor !== null && "seconds" in valor) {
+    const segundos = (valor as { seconds: unknown }).seconds;
+    return typeof segundos === "number" ? new Date(segundos * 1000) : null;
+  }
+
+  if (typeof valor === "number" && Number.isFinite(valor)) {
+    return new Date(valor);
+  }
+
+  if (typeof valor === "string") {
+    const data = new Date(valor);
+    return Number.isNaN(data.getTime()) ? null : data;
+  }
+
+  return null;
+}
 
 function eCodigo(valor: unknown): valor is CodigoNecessidade {
   return typeof valor === "string" && (CODIGOS as readonly string[]).includes(valor);
@@ -129,7 +205,11 @@ export async function listarResultados(): Promise<ResultadoComparavel[]> {
 
   consulta.forEach((documento) => {
     const dados = documento.data();
-    const resultado = dados.resultado as { notas?: unknown; predominantes?: unknown } | null;
+    const resultado = dados.resultado as {
+      notas?: unknown;
+      predominantes?: unknown;
+      registradoEm?: unknown;
+    } | null;
     const notas = notasValidas(resultado?.notas);
 
     if (!notas) {
@@ -141,10 +221,17 @@ export async function listarResultados(): Promise<ResultadoComparavel[]> {
     const predominantes = Array.isArray(resultado?.predominantes)
       ? resultado.predominantes.filter(eCodigo)
       : [];
+    const registradoEm = instanteDe(resultado?.registradoEm) ?? instanteDe(dados.atualizadoEm);
+
+    if (!registradoEm) {
+      return;
+    }
 
     lista.push({
       rm: documento.id,
       nome,
+      anonimo: dados.anonimo === true,
+      registradoEm,
       notas,
       predominantes,
     });

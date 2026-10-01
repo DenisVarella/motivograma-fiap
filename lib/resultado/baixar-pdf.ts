@@ -7,7 +7,10 @@ import { jsPDF } from "jspdf";
 
 const FUNDO = "#0c0c0e";
 
-export async function baixarResultadoPdf(elemento: HTMLElement) {
+export async function baixarResultadoPdf(
+  elemento: HTMLElement,
+  arquivo = "motivograma-resultado.pdf",
+) {
   const canvas = await domToCanvas(elemento, {
     backgroundColor: FUNDO,
     scale: 2,
@@ -35,7 +38,7 @@ export async function baixarResultadoPdf(elemento: HTMLElement) {
     deslocamento += alturaUtil;
   } while (deslocamento < alturaImagem);
 
-  pdf.save("motivograma-resultado.pdf");
+  pdf.save(arquivo);
 }
 
 function pintarFundo(pdf: jsPDF, largura: number, altura: number) {

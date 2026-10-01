@@ -7,6 +7,7 @@
 
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { obterFirestore } from "@/lib/firebase/cliente";
+import { instanteDe } from "@/lib/firebase/tempo";
 import { CODIGOS, type CodigoNecessidade } from "@/lib/motivograma/necessidades";
 import { montarPerfil, type Perfil } from "@/lib/motivograma/pontuacao";
 import { montarSessao, sessaoVazia, type Sessao } from "@/lib/motivograma/sessao";
@@ -79,6 +80,7 @@ export async function sincronizarSessao(sessao: Sessao) {
     const existente = await getDoc(referencia);
     const anterior = existente.data()?.resultado as { notas?: unknown; registradoEm?: unknown } | null;
 
+    // Reabrir a tela mantém a data. Começar de novo zera o resultado, então a próxima conclusão grava a data nova.
     if (anterior && mesmasNotas(anterior.notas, perfil) && anterior.registradoEm) {
       registradoEm = anterior.registradoEm;
     }
@@ -137,33 +139,6 @@ export async function definirAnonimato(rm: string, nome: string, anonimo: boolea
     { rm, nome, anonimo },
     { merge: true },
   );
-}
-
-function instanteDe(valor: unknown): Date | null {
-  if (!valor) {
-    return null;
-  }
-
-  if (typeof valor === "object" && valor !== null && "toDate" in valor) {
-    const data = (valor as { toDate: () => Date }).toDate();
-    return data instanceof Date && !Number.isNaN(data.getTime()) ? data : null;
-  }
-
-  if (typeof valor === "object" && valor !== null && "seconds" in valor) {
-    const segundos = (valor as { seconds: unknown }).seconds;
-    return typeof segundos === "number" ? new Date(segundos * 1000) : null;
-  }
-
-  if (typeof valor === "number" && Number.isFinite(valor)) {
-    return new Date(valor);
-  }
-
-  if (typeof valor === "string") {
-    const data = new Date(valor);
-    return Number.isNaN(data.getTime()) ? null : data;
-  }
-
-  return null;
 }
 
 function eCodigo(valor: unknown): valor is CodigoNecessidade {

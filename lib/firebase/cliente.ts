@@ -1,5 +1,5 @@
 /**
- * Cliente do Firestore usado no navegador.
+ * Cliente do Firestore, no navegador e nas rotas do servidor.
  * As chaves vêm do .env e precisam do prefixo NEXT_PUBLIC para o Next.js expô-las.
  */
 

@@ -1,6 +1,7 @@
+import { collection, getDocs } from "firebase/firestore";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { FirebaseAdminNaoConfiguradoError, obterFirestoreAdmin } from "@/lib/firebase/admin";
+import { FirebaseNaoConfiguradoError, obterFirestore } from "@/lib/firebase/cliente";
 import { montarPainel } from "@/lib/professor/painel";
 import { COOKIE_PROFESSOR, sessaoProfessorValida } from "@/lib/professor/sessao";
 
@@ -14,7 +15,7 @@ export async function GET() {
   }
 
   try {
-    const consulta = await obterFirestoreAdmin().collection("usuarios").get();
+    const consulta = await getDocs(collection(obterFirestore(), "usuarios"));
     const painel = montarPainel(
       consulta.docs.map((documento) => ({
         ...documento.data(),
@@ -24,7 +25,7 @@ export async function GET() {
 
     return NextResponse.json(painel);
   } catch (falha) {
-    if (falha instanceof FirebaseAdminNaoConfiguradoError) {
+    if (falha instanceof FirebaseNaoConfiguradoError) {
       return NextResponse.json({ erro: falha.message }, { status: 503 });
     }
 
